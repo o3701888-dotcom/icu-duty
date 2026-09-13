@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ICU 點班排程 Prototype v0.1</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">ICU</div>
+        <div><strong>點班排程</strong><span>Prototype v0.1</span></div>
+      </div>
+      <nav id="nav">
+        <div class="nav-label">每月操作</div>
+        <button data-view="home" class="active">🏠 排班首頁</button>
+        <button data-view="import">📥 匯入班表</button>
+        <button data-view="results">🗓️ 點班結果</button>
+        <button data-view="balance">🪄 平衡調整助手</button>
+        <button data-view="fairness">📊 公平檢視</button>
+        <button data-view="confirm-export">✅ 確認正式結果</button>
+        <button data-view="history">🕘 歷史次數</button>
+        <details class="settings-nav">
+          <summary>⚙️ 後台設定</summary>
+          <button data-view="people">👥 人員與資格</button>
+          <button data-view="duties">📋 點班項目</button>
+          <button data-view="holidays">📅 假日設定</button>
+          <button data-view="hard-rules">⛔ 強制規則</button>
+          <button data-view="soft-rules">⭐ 偏好規則</button>
+        </details>
+      </nav>
+      <div class="sidebar-note">班別代碼：05 白班 · 92 小夜 · 95 大夜 · 46 行政 · 00 休假</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">排班首頁</h1>
+          <p id="page-subtitle">先匯入班表，再依資格與規則自動分配每日點班。</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn ghost" id="resetBtn">重設範例</button>
+          <button class="btn primary" id="generateBtn">自動排點班</button>
+        </div>
+      </header>
+
+      <section id="view-home" class="view active"></section>
+      <section id="view-import" class="view"></section>
+      <section id="view-people" class="view"></section>
+      <section id="view-duties" class="view"></section>
+      <section id="view-holidays" class="view"></section>
+      <section id="view-hard-rules" class="view"></section>
+      <section id="view-soft-rules" class="view"></section>
+      <section id="view-results" class="view"></section>
+      <section id="view-balance" class="view"></section>
+      <section id="view-fairness" class="view"></section>
+      <section id="view-confirm-export" class="view"></section>
+      <section id="view-history" class="view"></section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="sample-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
