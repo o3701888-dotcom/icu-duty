@@ -403,7 +403,11 @@
   function currentRecord(){
     const cnt=counts(false),people={};
     state.people.forEach(p=>{if(!p.active)return;people[p.name]={total:cnt[p.id]?.total||0,support:cnt[p.id]?.support||0,byDuty:{...(cnt[p.id]?.byDuty||{})}};});
-    return {period:`${state.year}-${String(state.month).padStart(2,'0')}`,sourceName:state.sourceName||'',confirmedAt:new Date().toISOString(),people};
+    const assignments=Object.entries(state.assignments).map(([slot,pid])=>{
+      const [day,shift,dutyId]=slot.split('|'),duty=dutyById(dutyId),person=personById(pid);
+      return {day:+day,date:dateKey(+day),shift,shiftLabel:SHIFT_LABELS[shift]||shift,dutyId,dutyCode:duty?.code||dutyId,dutyName:duty?.name||'',personName:person?.name||''};
+    }).sort((a,b)=>a.day-b.day||SHIFT_ORDER.indexOf(a.shift)-SHIFT_ORDER.indexOf(b.shift)||a.dutyCode.localeCompare(b.dutyCode,'zh-Hant'));
+    return {period:`${state.year}-${String(state.month).padStart(2,'0')}`,sourceName:state.sourceName||'',confirmedAt:new Date().toISOString(),people,assignments};
   }
   function saveOfficialHistory(){
     if(!Object.keys(state.assignments).length)return false;
@@ -411,10 +415,35 @@
     if(idx>=0)state.history[idx]=record;else state.history.push(record);
     save();return true;
   }
+  function downloadBlob(filename,content,type){
+    const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function csvValue(value){const s=String(value??'');return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}
+  function downloadOfficialCsv(record){
+    const rows=record?.assignments?.length?record.assignments:currentRecord().assignments;
+    const header=['日期','星期','班別','點班代號','工作內容','姓名'];
+    const body=rows.map(r=>[r.date,'日一二三四五六'[new Date(`${r.date}T12:00:00`).getDay()],r.shiftLabel,r.dutyCode,r.dutyName,r.personName]);
+    const csv='\ufeff'+[header,...body].map(row=>row.map(csvValue).join(',')).join('\r\n');
+    downloadBlob(`ICU_點班正式結果_${record.period}.csv`,csv,'text/csv;charset=utf-8');
+  }
+  function downloadFullBackup(){
+    downloadBlob(`ICU_點班完整備份_${state.year}-${String(state.month).padStart(2,'0')}.json`,JSON.stringify(state,null,2),'application/json;charset=utf-8');
+  }
+  async function restoreFullBackup(file){
+    try{
+      const parsed=JSON.parse(await file.text());
+      if(!parsed||!Array.isArray(parsed.people)||!Array.isArray(parsed.schedule)||!Array.isArray(parsed.duties))throw new Error('格式不符');
+      state=parsed;migrateState();save();renderAll();showView('confirm-export');toast('完整備份已載入');
+    }catch(e){toast('備份檔無法載入，請確認檔案是否正確');}
+  }
   function renderConfirmExport(){
     const el=document.querySelector('#view-confirm-export'),period=`${state.year}-${String(state.month).padStart(2,'0')}`,saved=state.history.find(h=>h.period===period);
-    el.innerHTML=`<div class="card"><div class="toolbar"><div><h2>確認本月正式結果</h2><p class="muted">只有按下確認的這一版會納入歷史公平計算。預覽、人工調整與重新排班都不會寫入歷史。</p></div><span class="tag ${saved?'good':''}">${saved?'本月已有正式紀錄':'尚未確認'}</span></div><div class="status-list"><div class="status-item"><span>月份</span><strong>${period}</strong></div><div class="status-item"><span>目前指派</span><strong>${Object.keys(state.assignments).length} 格</strong></div><div class="status-item"><span>確認方式</span><strong>${saved?'再次確認會覆蓋本月舊紀錄':'確認後寫入歷史次數'}</strong></div></div><button class="btn primary" id="officialExport" style="margin-top:14px">${saved?'更新本月正式紀錄':'確認並保存到歷史次數'}</button></div>`;
+    el.innerHTML=`<div class="card"><div class="toolbar"><div><h2>確認本月正式結果</h2><p class="muted">只有按下確認的這一版會納入歷史公平計算。預覽、人工調整與重新排班都不會寫入歷史。</p></div><span class="tag ${saved?'good':''}">${saved?'本月已有正式紀錄':'尚未確認'}</span></div><div class="status-list"><div class="status-item"><span>月份</span><strong>${period}</strong></div><div class="status-item"><span>目前指派</span><strong>${Object.keys(state.assignments).length} 格</strong></div><div class="status-item"><span>確認方式</span><strong>${saved?'再次確認會覆蓋本月舊紀錄':'確認後寫入歷史次數'}</strong></div></div><div class="toolbar" style="margin-top:14px;justify-content:flex-start;gap:8px;flex-wrap:wrap"><button class="btn primary" id="officialExport">${saved?'更新本月正式紀錄':'確認並保存到歷史次數'}</button>${saved?'<button class="btn" id="downloadOfficial">下載正式結果 CSV</button>':''}<button class="btn" id="downloadBackup">下載完整備份</button><label class="btn" for="restoreBackup" style="cursor:pointer">載入完整備份</label><input id="restoreBackup" type="file" accept="application/json,.json" hidden></div><div class="notice warn" style="margin-top:12px">CSV 適合傳給護理長用 Excel 檢視；完整備份包含人員、資格、規則、精確排班與歷史，請妥善保存，不要放在公開空間。</div></div>`;
     el.querySelector('#officialExport').onclick=()=>{if(!saveOfficialHistory()){toast('請先產生點班結果');return;}renderAll();showView('confirm-export');toast('本月正式結果已保存到歷史次數');};
+    el.querySelector('#downloadOfficial')?.addEventListener('click',()=>downloadOfficialCsv(saved));
+    el.querySelector('#downloadBackup').onclick=downloadFullBackup;
+    el.querySelector('#restoreBackup').onchange=e=>{const file=e.target.files?.[0];if(file)restoreFullBackup(file);};
   }
   function renderHistory(){
     const el=document.querySelector('#view-history'),duties=state.duties.filter(d=>d.enabled&&d.id!=='support'),totals={};
